@@ -1,0 +1,41 @@
+"""
+Core physics, radiative transfer models, and water masking algorithms.
+"""
+
+from .config import (
+    NECHAD_COEFFICIENTS,
+    DOGLIOTTI_THRESHOLDS,
+    REDEDGE_THRESHOLDS,
+    SBAF_FACTORS,
+    GEE_DATASETS
+)
+from .algorithms import (
+    compute_nechad_model,
+    compute_dogliotti_blended,
+    compute_rededge_turbidity,
+    apply_sbaf_correction,
+    compute_ndwi,
+    compute_mndwi
+)
+from .water_mask import (
+    create_s2_water_mask,
+    create_landsat_water_mask,
+    create_hybrid_water_mask
+)
+
+__all__ = [
+    "NECHAD_COEFFICIENTS",
+    "DOGLIOTTI_THRESHOLDS",
+    "REDEDGE_THRESHOLDS",
+    "SBAF_FACTORS",
+    "GEE_DATASETS",
+    "compute_nechad_model",
+    "compute_dogliotti_blended",
+    "compute_rededge_turbidity",
+    "apply_sbaf_correction",
+    "compute_ndwi",
+    "compute_mndwi",
+    "create_s2_water_mask",
+    "create_landsat_water_mask",
+    "create_hybrid_water_mask",
+]
