@@ -14,6 +14,7 @@ Covers:
 """
 
 import os
+import json
 import pytest
 import numpy as np
 import pandas as pd
@@ -27,6 +28,10 @@ from rivsat.core import (
     apply_sbaf_correction,
     compute_ndwi,
     compute_mndwi,
+    compute_ndci_chlorophyll,
+    compute_cdom,
+    compute_salinity,
+    compute_secchi_depth,
     create_s2_water_mask,
     create_landsat_water_mask,
     create_hybrid_water_mask
@@ -550,3 +555,81 @@ class TestMatchupEngine:
         empty_df = pd.DataFrame(columns=["datetime", "lon", "lat", "value"])
         res = find_spatiotemporal_matchups(empty_df, [])
         assert res.empty
+
+
+# ===========================================================================
+# 10. MULTI-PARAMETER WATER QUALITY ALGORITHMS
+# ===========================================================================
+
+class TestWaterQualityAlgorithms:
+    """Tests for Chlorophyll-a, CDOM, Salinity, and Secchi Depth algorithms."""
+
+    def test_compute_ndci_chlorophyll(self):
+        """NDCI Chlorophyll-a should increase with higher Red-Edge reflectance."""
+        r_red = np.array([0.02, 0.02], dtype=np.float32)
+        r_re = np.array([0.03, 0.05], dtype=np.float32)
+        chl = compute_ndci_chlorophyll(r_red, r_re)
+        assert chl[1] > chl[0]
+        assert not np.any(np.isnan(chl))
+
+    def test_compute_cdom(self):
+        """CDOM should decrease as Green/Red ratio increases."""
+        g = np.array([0.04, 0.06], dtype=np.float32)
+        r = np.array([0.02, 0.02], dtype=np.float32)
+        cdom = compute_cdom(g, r)
+        assert cdom[1] < cdom[0]
+        assert not np.any(np.isnan(cdom))
+
+    def test_compute_salinity(self):
+        """Salinity should decrease with higher CDOM absorption."""
+        cdom = np.array([0.5, 2.0], dtype=np.float32)
+        sal = compute_salinity(cdom)
+        assert sal[0] > sal[1]
+        assert np.all(sal <= 35.0)
+
+    def test_compute_secchi_depth(self):
+        """Secchi depth should decrease with higher turbidity."""
+        turb = np.array([10.0, 100.0], dtype=np.float32)
+        sdd = compute_secchi_depth(turb)
+        assert sdd[0] > sdd[1]
+
+
+# ===========================================================================
+# 11. SCENE PROCESSOR PIPELINE
+# ===========================================================================
+
+class TestSceneProcessor:
+    """Tests for SceneProcessor end-to-end scene processing."""
+
+    def test_scene_processor_execution(self, tmp_path):
+        """SceneProcessor should execute without NameErrors or missing imports."""
+        from rivsat.processing.processor import SceneProcessor
+
+        scene_dir = tmp_path / "S2_2023_Test_Median"
+        scene_dir.mkdir()
+
+        # Create dummy raster files
+        profile = {
+            "driver": "GTiff", "dtype": "float32", "nodata": None,
+            "width": 10, "height": 10, "count": 1, "crs": "EPSG:4326",
+            "transform": from_origin(90.0, 23.0, 0.001, 0.001)
+        }
+        dummy = np.full((10, 10), 0.05, dtype=np.float32)
+
+        for b in ["B2.tif", "B3.tif", "B4.tif", "B5.tif", "B8A.tif", "B11.tif", "SCL.tif"]:
+            with rasterio.open(scene_dir / b, "w", **profile) as dst:
+                dst.write(dummy if "SCL" not in b else np.full((10, 10), 6, dtype=np.uint8), 1)
+
+        meta = {"sensor": "S2", "date": "2023_Test_Median"}
+        with open(scene_dir / "metadata.json", "w") as f:
+            json.dump(meta, f)
+
+        proc = SceneProcessor(str(scene_dir))
+        res = proc.process()
+        assert "turbidity" in res
+        assert "chlorophyll" in res
+        assert "cdom" in res
+        assert "salinity" in res
+        assert "secchi_depth" in res
+
+

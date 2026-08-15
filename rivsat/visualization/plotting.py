@@ -195,6 +195,66 @@ def plot_scene_triplet(
     return fig
 
 
+def plot_multiparameter_grid(
+    results_dict: Dict[str, Any],
+    scene_title: str = "Multi-Parameter Water Quality Suite",
+    save_path: Optional[str] = None,
+    figsize: Tuple[int, int] = (16, 10),
+    dpi: int = 300
+) -> plt.Figure:
+    """
+    Renders a 6-panel scientific grid visualizer displaying all 6 water quality parameters:
+    1. Turbidity (FNU)
+    2. Total Suspended Solids (TSS in mg/L)
+    3. Chlorophyll-a (ug/L)
+    4. CDOM (a_g(440) in m^-1)
+    5. Estuarine Surface Salinity (PSU)
+    6. Secchi Disk Depth (m)
+    """
+    fig, axes = plt.subplots(2, 3, figsize=figsize, dpi=dpi)
+    axes_flat = axes.flatten()
+
+    params_config = [
+        ("turbidity", "Turbidity (Dogliotti)", "FNU", TURBID_CMAP),
+        ("tss", "Total Suspended Solids (TSS)", "mg/L", "YlOrBr"),
+        ("chlorophyll", "Chlorophyll-a (NDCI)", "ug/L", "YlGn"),
+        ("cdom", "CDOM (a_g 440)", "m^-1", "copper"),
+        ("salinity", "Estuarine Salinity", "PSU", "Blues_r"),
+        ("secchi_depth", "Secchi Disk Depth", "m", "viridis")
+    ]
+
+    for idx, (key, title_str, unit_str, cmap_str) in enumerate(params_config):
+        ax = axes_flat[idx]
+        ax.set_facecolor("#e8ecef")
+
+        arr = results_dict.get(key)
+        if arr is not None and not np.all(np.isnan(arr)):
+            valid_vals = arr[~np.isnan(arr) & (arr >= 0)]
+            vmax_dynamic = float(np.percentile(valid_vals, 98)) if len(valid_vals) > 0 else 100.0
+            vmax_dynamic = max(vmax_dynamic, 1.0)
+            vmin_val = 0.0
+
+            im = ax.imshow(arr, cmap=cmap_str, vmin=vmin_val, vmax=vmax_dynamic)
+            cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            cbar.set_label(unit_str, fontsize=10, fontweight="bold")
+            ax.set_title(title_str, fontsize=11, fontweight="bold")
+        else:
+            ax.text(0.5, 0.5, "Data Not Available", ha="center", va="center", fontsize=11)
+            ax.set_title(title_str, fontsize=11, fontweight="bold")
+
+        ax.axis("off")
+
+    fig.suptitle(scene_title, fontsize=14, fontweight="bold", y=0.98)
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+        fig.savefig(save_path, bbox_inches="tight", dpi=dpi)
+        print(f"[OK] Saved multi-parameter grid figure: {save_path}")
+
+    return fig
+
+
 def plot_station_timeseries(
     df: pd.DataFrame,
     parameter: str = "turbidity",
@@ -208,6 +268,15 @@ def plot_station_timeseries(
     Renders publication-ready time-series chart showing variations across virtual stations.
     """
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    if df.empty or "station_name" not in df.columns:
+        ax.text(0.5, 0.5, "No Station Data Available", ha="center", va="center", fontsize=12)
+        ax.set_title(title, fontsize=13, fontweight="bold")
+        ax.axis("off")
+        if save_path:
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            fig.savefig(save_path, bbox_inches="tight", dpi=dpi)
+        return fig
 
     col_mean = f"{parameter}_mean"
     col_std = f"{parameter}_std"

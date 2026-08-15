@@ -15,7 +15,8 @@ from .config import (
     NECHAD_COEFFICIENTS,
     DOGLIOTTI_THRESHOLDS,
     REDEDGE_THRESHOLDS,
-    SBAF_FACTORS
+    SBAF_FACTORS,
+    WATER_QUALITY_COEFFICIENTS
 )
 
 
@@ -220,3 +221,98 @@ def compute_mndwi(green: np.ndarray, swir: np.ndarray) -> np.ndarray:
         mndwi = (g - s) / (g + s)
         mndwi = np.where(np.isnan(mndwi) | (g + s == 0), -1.0, mndwi)
     return np.clip(mndwi, -1.0, 1.0).astype(np.float32)
+
+
+def compute_ndci_chlorophyll(
+    rho_red: np.ndarray,
+    rho_rededge: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Computes Chlorophyll-a concentration (ug/L) using the Normalized Difference
+    Chlorophyll Index (NDCI; Mishra & Mishra, 2012):
+
+        NDCI = (rho_w(705) - rho_w(665)) / (rho_w(705) + rho_w(665))
+        Chl-a = a0 + a1 * NDCI + a2 * NDCI^2
+    """
+    r_red = np.asarray(rho_red, dtype=np.float32)
+    r_re = np.asarray(rho_rededge, dtype=np.float32)
+
+    coeffs = custom_coeffs or WATER_QUALITY_COEFFICIENTS["chlorophyll_NDCI"]
+    a0, a1, a2 = coeffs["a0"], coeffs["a1"], coeffs["a2"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        denom = r_re + r_red
+        ndci = np.where(denom != 0.0, (r_re - r_red) / denom, np.nan)
+        chl_a = a0 + a1 * ndci + a2 * (ndci ** 2)
+        chl_a = np.where(np.isnan(ndci) | (chl_a < 0.0), np.nan, chl_a)
+
+    return chl_a.astype(np.float32)
+
+
+def compute_cdom(
+    rho_green: np.ndarray,
+    rho_red: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Estimates Colored Dissolved Organic Matter (CDOM / a_g(440) in m^-1) using
+    the Green/Red spectral reflectance ratio model (Griffin et al., 2018):
+
+        a_cdom(440) = c0 * (rho_w(Green) / rho_w(Red))^c1
+    """
+    g = np.asarray(rho_green, dtype=np.float32)
+    r = np.asarray(rho_red, dtype=np.float32)
+
+    coeffs = custom_coeffs or WATER_QUALITY_COEFFICIENTS["cdom_GreenRed"]
+    c0, c1 = coeffs["c0"], coeffs["c1"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ratio = g / r
+        cdom = c0 * (ratio ** c1)
+        cdom = np.where(np.isnan(ratio) | (r <= 0.0) | (g <= 0.0) | (cdom < 0.0), np.nan, cdom)
+
+    return cdom.astype(np.float32)
+
+
+def compute_salinity(
+    cdom_arr: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Estimates Estuarine Surface Salinity (SSS in PSU) using a CDOM empirical mixing
+    proxy model (Subramaniam et al., 2011):
+
+        Salinity (PSU) = S_ocean - k * a_cdom(440)
+    """
+    cdom = np.asarray(cdom_arr, dtype=np.float32)
+
+    coeffs = custom_coeffs or WATER_QUALITY_COEFFICIENTS["salinity_CDOM"]
+    s_ocean, k = coeffs["S_ocean"], coeffs["k"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        sal = s_ocean - k * cdom
+        sal = np.where(np.isnan(cdom), np.nan, np.clip(sal, 0.0, s_ocean))
+
+    return sal.astype(np.float32)
+
+
+def compute_secchi_depth(
+    turbidity_arr: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Estimates Secchi Disk Depth (SDD in meters) from water turbidity (Lee et al., 2015):
+
+        SDD = a / (Turbidity ^ b)
+    """
+    turb = np.asarray(turbidity_arr, dtype=np.float32)
+
+    coeffs = custom_coeffs or WATER_QUALITY_COEFFICIENTS["secchi_Turbidity"]
+    a, b = coeffs["a"], coeffs["b"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        sdd = a / (np.maximum(turb, 0.1) ** b)
+        sdd = np.where(np.isnan(turb) | (turb <= 0.0), np.nan, sdd)
+
+    return sdd.astype(np.float32)

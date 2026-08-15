@@ -26,7 +26,11 @@ from ..core.algorithms import (
     compute_rededge_turbidity,
     apply_sbaf_correction,
     compute_ndwi,
-    compute_mndwi
+    compute_mndwi,
+    compute_ndci_chlorophyll,
+    compute_cdom,
+    compute_salinity,
+    compute_secchi_depth
 )
 from ..core.water_mask import (
     create_s2_water_mask,
@@ -246,11 +250,29 @@ class SceneProcessor:
             turbidity = np.where(mask_re_switch, turbidity_re, turbidity)
             tss = np.where(mask_re_switch, tss_re, tss)
 
-        # 7. Apply Water Mask & Non-Physical Negative Filter
+        # 7. Compute Chlorophyll-a, CDOM, Salinity, and Secchi Depth
+        if rho_re is not None:
+            chl = compute_ndci_chlorophyll(rho_red, rho_re)
+        else:
+            chl = compute_ndci_chlorophyll(rho_red, rho_nir)
+
+        if rho_green is not None:
+            cdom = compute_cdom(rho_green, rho_red)
+        else:
+            cdom = np.full_like(rho_red, np.nan, dtype=np.float32)
+
+        salinity = compute_salinity(cdom)
+        secchi = compute_secchi_depth(turbidity)
+
+        # 8. Apply Water Mask & Non-Physical Negative Filter
         turbidity_masked = np.where(water_mask & (turbidity > 0.0), turbidity, np.nan).astype(np.float32)
         tss_masked = np.where(water_mask & (tss > 0.0), tss, np.nan).astype(np.float32)
+        chl_masked = np.where(water_mask & (chl > 0.0), chl, np.nan).astype(np.float32)
+        cdom_masked = np.where(water_mask & (cdom > 0.0), cdom, np.nan).astype(np.float32)
+        salinity_masked = np.where(water_mask & (salinity >= 0.0), salinity, np.nan).astype(np.float32)
+        secchi_masked = np.where(water_mask & (secchi > 0.0), secchi, np.nan).astype(np.float32)
 
-        # 8. Export Cloud-Optimized GeoTIFF Products
+        # 9. Export Cloud-Optimized GeoTIFF Products for all 6 parameters
         out_profile = ref_profile.copy()
         out_profile.update(
             dtype=rasterio.float32,
@@ -259,15 +281,34 @@ class SceneProcessor:
             compress='lzw'
         )
 
-        turbidity_tif = os.path.join(out_dir, f"{self.sensor}_{self.date_str}_Turbidity_FNU.tif")
-        tss_tif = os.path.join(out_dir, f"{self.sensor}_{self.date_str}_TSS_mgL.tif")
-        mask_tif = os.path.join(out_dir, f"{self.sensor}_{self.date_str}_WaterMask.tif")
+        raster_dir = os.path.join(out_dir, "rasters")
+        os.makedirs(raster_dir, exist_ok=True)
+
+        turbidity_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_Turbidity_FNU.tif")
+        tss_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_TSS_mgL.tif")
+        chl_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_Chlorophyll_ugL.tif")
+        cdom_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_CDOM_m1.tif")
+        salinity_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_Salinity_PSU.tif")
+        secchi_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_SecchiDepth_m.tif")
+        mask_tif = os.path.join(raster_dir, f"{self.sensor}_{self.date_str}_WaterMask.tif")
 
         with rasterio.open(turbidity_tif, 'w', **out_profile) as dst:
             dst.write(turbidity_masked, 1)
 
         with rasterio.open(tss_tif, 'w', **out_profile) as dst:
             dst.write(tss_masked, 1)
+
+        with rasterio.open(chl_tif, 'w', **out_profile) as dst:
+            dst.write(chl_masked, 1)
+
+        with rasterio.open(cdom_tif, 'w', **out_profile) as dst:
+            dst.write(cdom_masked, 1)
+
+        with rasterio.open(salinity_tif, 'w', **out_profile) as dst:
+            dst.write(salinity_masked, 1)
+
+        with rasterio.open(secchi_tif, 'w', **out_profile) as dst:
+            dst.write(secchi_masked, 1)
 
         mask_profile = out_profile.copy()
         mask_profile.update(dtype=rasterio.uint8, nodata=0)
@@ -277,6 +318,9 @@ class SceneProcessor:
         # Summary statistics over water
         valid_turb = turbidity_masked[~np.isnan(turbidity_masked)]
         valid_tss = tss_masked[~np.isnan(tss_masked)]
+        valid_chl = chl_masked[~np.isnan(chl_masked)]
+        valid_sal = salinity_masked[~np.isnan(salinity_masked)]
+        valid_secchi = secchi_masked[~np.isnan(secchi_masked)]
 
         stats = {
             "sensor": self.sensor,
@@ -284,13 +328,18 @@ class SceneProcessor:
             "water_pixel_count": int(np.sum(water_mask)),
             "turbidity_mean_fnu": float(np.mean(valid_turb)) if len(valid_turb) > 0 else 0.0,
             "turbidity_median_fnu": float(np.median(valid_turb)) if len(valid_turb) > 0 else 0.0,
-            "turbidity_std_fnu": float(np.std(valid_turb)) if len(valid_turb) > 0 else 0.0,
-            "turbidity_p90_fnu": float(np.percentile(valid_turb, 90)) if len(valid_turb) > 0 else 0.0,
             "tss_mean_mg_l": float(np.mean(valid_tss)) if len(valid_tss) > 0 else 0.0,
             "tss_median_mg_l": float(np.median(valid_tss)) if len(valid_tss) > 0 else 0.0,
+            "chlorophyll_mean_ug_l": float(np.mean(valid_chl)) if len(valid_chl) > 0 else 0.0,
+            "salinity_mean_psu": float(np.mean(valid_sal)) if len(valid_sal) > 0 else 0.0,
+            "secchi_depth_mean_m": float(np.mean(valid_secchi)) if len(valid_secchi) > 0 else 0.0,
             "files": {
                 "turbidity_geotiff": turbidity_tif,
                 "tss_geotiff": tss_tif,
+                "chlorophyll_geotiff": chl_tif,
+                "cdom_geotiff": cdom_tif,
+                "salinity_geotiff": salinity_tif,
+                "secchi_geotiff": secchi_tif,
                 "water_mask_geotiff": mask_tif
             }
         }
@@ -298,6 +347,10 @@ class SceneProcessor:
         return {
             "turbidity": turbidity_masked,
             "tss": tss_masked,
+            "chlorophyll": chl_masked,
+            "cdom": cdom_masked,
+            "salinity": salinity_masked,
+            "secchi_depth": secchi_masked,
             "water_mask": water_mask,
             "weight": weight,
             "rho_red": rho_red,

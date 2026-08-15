@@ -7,6 +7,7 @@ from .config import (
     DOGLIOTTI_THRESHOLDS,
     REDEDGE_THRESHOLDS,
     SBAF_FACTORS,
+    WATER_QUALITY_COEFFICIENTS,
     GEE_DATASETS
 )
 from .algorithms import (
@@ -15,7 +16,11 @@ from .algorithms import (
     compute_rededge_turbidity,
     apply_sbaf_correction,
     compute_ndwi,
-    compute_mndwi
+    compute_mndwi,
+    compute_ndci_chlorophyll,
+    compute_cdom,
+    compute_salinity,
+    compute_secchi_depth
 )
 from .water_mask import (
     create_s2_water_mask,
@@ -28,6 +33,7 @@ __all__ = [
     "DOGLIOTTI_THRESHOLDS",
     "REDEDGE_THRESHOLDS",
     "SBAF_FACTORS",
+    "WATER_QUALITY_COEFFICIENTS",
     "GEE_DATASETS",
     "compute_nechad_model",
     "compute_dogliotti_blended",
@@ -35,6 +41,10 @@ __all__ = [
     "apply_sbaf_correction",
     "compute_ndwi",
     "compute_mndwi",
+    "compute_ndci_chlorophyll",
+    "compute_cdom",
+    "compute_salinity",
+    "compute_secchi_depth",
     "create_s2_water_mask",
     "create_landsat_water_mask",
     "create_hybrid_water_mask",

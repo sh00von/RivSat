@@ -63,7 +63,21 @@ class TimeSeriesEngine:
         """
         records = []
 
-        file_tag = "Turbidity_FNU" if parameter.lower().startswith("turb") else "TSS_mgL"
+        param_clean = parameter.lower()
+        if "turb" in param_clean:
+            file_tag = "Turbidity_FNU"
+        elif "tss" in param_clean or "spm" in param_clean:
+            file_tag = "TSS_mgL"
+        elif "chl" in param_clean or "ndci" in param_clean:
+            file_tag = "Chlorophyll_ugL"
+        elif "cdom" in param_clean:
+            file_tag = "CDOM_m1"
+        elif "sal" in param_clean:
+            file_tag = "Salinity_PSU"
+        elif "secchi" in param_clean or "sdd" in param_clean:
+            file_tag = "SecchiDepth_m"
+        else:
+            file_tag = parameter
 
         for s_dir in self.scene_dirs:
             meta_path = os.path.join(s_dir, "metadata.json")
@@ -78,8 +92,19 @@ class TimeSeriesEngine:
                 sensor = parts[0]
                 date_str = "_".join(parts[1:])
 
-            # Locate target GeoTIFF
-            tifs = glob.glob(os.path.join(s_dir, f"*{file_tag}*.tif"))
+            # Locate target GeoTIFF recursively across scene_dir, rasters subfolder, and output folders
+            tifs = (
+                glob.glob(os.path.join(s_dir, f"*{file_tag}*.tif")) +
+                glob.glob(os.path.join(s_dir, "rasters", f"*{file_tag}*.tif")) +
+                glob.glob(os.path.join(s_dir, "**", f"*{file_tag}*.tif"), recursive=True)
+            )
+            if not tifs:
+                # Fallback search in outputs directory
+                bname = os.path.basename(s_dir)
+                tifs = glob.glob(os.path.abspath(os.path.join(".", "outputs", "**", f"*{bname}*{file_tag}*.tif")), recursive=True)
+                if not tifs:
+                    tifs = glob.glob(os.path.abspath(os.path.join(".", "outputs", "**", f"*{file_tag}*.tif")), recursive=True)
+            
             if not tifs:
                 continue
 

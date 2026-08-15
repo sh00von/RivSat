@@ -286,6 +286,18 @@ def extract_cross_transects(
         cols = np.round(cols).astype(np.int32)
         rows = np.round(rows).astype(np.int32)
 
+        # Compute active river channel width (in meters) along this transect
+        sample_vals = np.array([
+            float(raster_data[rows[s], cols[s]]) if (0 <= rows[s] < height and 0 <= cols[s] < width) else np.nan
+            for s in range(samples_per_transect)
+        ], dtype=np.float32)
+        
+        valid_offsets = offsets_m[~np.isnan(sample_vals)]
+        if len(valid_offsets) >= 2:
+            channel_width = float(np.max(valid_offsets) - np.min(valid_offsets))
+        else:
+            channel_width = np.nan
+
         for s in range(samples_per_transect):
             r, c = rows[s], cols[s]
             if 0 <= r < height and 0 <= c < width:
@@ -299,7 +311,8 @@ def extract_cross_transects(
                 "cross_dist_m": round(offsets_m[s], 1),
                 "lon": float(px_deg[s]),
                 "lat": float(py_deg[s]),
-                "value": val
+                "value": val,
+                "channel_width_m": round(channel_width, 1) if not np.isnan(channel_width) else np.nan
             })
 
     return pd.DataFrame(records)

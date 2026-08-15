@@ -56,6 +56,7 @@ from .visualization import (
     fill_spatial_cloud_gaps,
     plot_turbidity_map,
     plot_scene_triplet,
+    plot_multiparameter_grid,
     plot_station_timeseries,
     plot_longitudinal_gradient,
     plot_cross_transects,

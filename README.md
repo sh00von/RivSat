@@ -1,23 +1,32 @@
 # 🌊 RivSat
 
-**A CoastSat-style, physics-based satellite remote sensing framework designed for interactive Jupyter Lab research on water turbidity (FNU) and Total Suspended Solids (TSS / SPM) in rivers, estuaries, and coastal plumes.**
+**A universal, physics-based satellite remote sensing and hydro-engineering platform designed for multi-parameter water quality mapping (Turbidity, TSS, Chlorophyll-a, CDOM, Estuarine Salinity, Secchi Depth), active river channel width ($W$) tracking, and longitudinal chainage analytics in rivers, estuaries, and coastal plumes.**
 
-RivSat provides an 8-step interactive Jupyter notebook pipeline for downloading, processing, analyzing, and validating water quality retrievals from **Sentinel-2 MSI** and **Landsat 8/9 OLI** via **Google Earth Engine (GEE)**.
+RivSat provides a complete interactive Jupyter notebook pipeline for downloading, processing, analyzing, and exporting water quality retrievals from **Sentinel-2 MSI** and **Landsat 8/9 OLI** via **Google Earth Engine (GEE)**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![JupyterLab](https://img.shields.io/badge/JupyterLab-4.0+-orange.svg)](https://jupyter.org/)
-[![CI](https://github.com/shovon/rivsat/actions/workflows/ci.yml/badge.svg)](https://github.com/shovon/rivsat/actions)
-[![Tests](https://img.shields.io/badge/tests-46%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-51%20passed-brightgreen.svg)](tests/)
+
+---
+
+## 📚 Official Documentation Suite
+
+- 📖 [**Documentation Portal (`docs/INDEX.md`)**](docs/INDEX.md)
+- 📚 [**Peer-Reviewed Literature Review**](docs/LITERATURE_REVIEW.md)
+- 🧮 [**Algorithms & Physics Guide**](docs/ALGORITHMS_GUIDE.md)
+- 🚀 [**User Guide & Quickstart**](docs/USER_GUIDE.md)
+- 🏗️ [**Hydro-Engineering Guide**](docs/HYDRO_ENGINEERING_GUIDE.md)
+- 🗺️ [**GIS Integration Guide**](docs/GIS_INTEGRATION.md)
 
 ---
 
 ## 📋 Table of Contents
 
+- [Documentation Suite](#-official-documentation-suite)
 - [System Requirements](#-system-requirements)
 - [Installation Guide](#-installation-guide)
-  - [Option A: Python Virtual Environment (pip)](#option-a-python-virtual-environment-pip)
-  - [Option B: Conda / Mamba Environment](#option-b-conda--mamba-environment)
 - [Google Earth Engine Setup](#-google-earth-engine-gee-setup)
 - [Launching Jupyter Lab](#-launching-jupyter-lab)
 - [Troubleshooting & Common Issues](#-troubleshooting--common-issues)

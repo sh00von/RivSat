@@ -1,16 +1,22 @@
 """
-Configuration and bio-optical calibration coefficients for satellite water turbidity
-and Total Suspended Solids (TSS) retrieval.
+Configuration and bio-optical calibration coefficients for multi-parameter satellite
+water quality estimation (Turbidity, TSS, Chlorophyll-a, CDOM, Salinity, Secchi Depth).
 
-References:
-- Dogliotti et al. (2015): A single algorithm to retrieve turbidity from 
-  low to high turbid waters based on red and near-infrared reflectance. RSE.
-- Nechad et al. (2010): Calibration and validation of a universal algorithm
-  for retrieval of total suspended matter from MERIS and MODIS. RSE.
-- Nechad et al. (2016): Sensor-specific calibration of a semi-analytical algorithm
-  for turbidity and TSS from Sentinel-2 MSI and Landsat-8 OLI.
-- Pahlevan et al. (2019): Seamless Retrievals of Suspended Particulate Matter
-  from Landsat-8 and Sentinel-2. RSE.
+Peer-Reviewed Literature References:
+- Dogliotti et al. (2015): A single algorithm to retrieve turbidity from low to high turbid
+  waters based on red and near-infrared reflectance. RSE, 156, 157-168.
+- Nechad et al. (2010): Calibration and validation of a universal algorithm for retrieval of
+  total suspended matter from MERIS and MODIS. RSE, 114(5), 854-866.
+- Nechad et al. (2016): Sensor-specific calibration of a semi-analytical algorithm for
+  turbidity and TSS from Sentinel-2 MSI and Landsat-8 OLI.
+- Mishra & Mishra (2012): Normalized difference chlorophyll index: A novel model for remote
+  estimation of chlorophyll-a in turbid productive waters. RSE, 117, 394-406.
+- Griffin et al. (2018): Satellite remote sensing of dissolved organic carbon in major river systems.
+  RSE, 209, 94-109.
+- Subramaniam et al. (2011): Amazon river plume dynamics and sea surface salinity from optical remote sensing.
+  JGR: Oceans, 116(C3).
+- Lee et al. (2015): Secchi disk depth: A new theory and mechanistic model for underwater visibility.
+  RSE, 157, 135-144.
 """
 
 from typing import Dict, Any
@@ -78,6 +84,34 @@ SBAF_FACTORS = {
         "red": {"slope": 0.982, "intercept": 0.0008},
         "nir": {"slope": 1.005, "intercept": -0.0003},
         "green": {"slope": 0.991, "intercept": 0.0004},
+    }
+}
+
+# ==============================================================================
+# 5. MULTI-PARAMETER WATER QUALITY CALIBRATION COEFFICIENTS
+# ==============================================================================
+# References:
+# - Mishra & Mishra (2012): NDCI for Chlorophyll-a retrieval
+# - Griffin et al. (2018): CDOM estimation from spectral reflectance ratios
+# - Subramaniam et al. (2011): CDOM-salinity proxy model in estuarine plumes
+# - Lee et al. (2015): Quasi-analytical algorithm for water clarity / Secchi depth
+WATER_QUALITY_COEFFICIENTS = {
+    "chlorophyll_NDCI": {
+        "a0": 14.039,
+        "a1": 86.11,
+        "a2": 194.32
+    },
+    "cdom_GreenRed": {
+        "c0": 1.25,
+        "c1": -1.42
+    },
+    "salinity_CDOM": {
+        "S_ocean": 35.0,
+        "k": 4.2
+    },
+    "secchi_Turbidity": {
+        "a": 1.7,
+        "b": 0.8
     }
 }
 
