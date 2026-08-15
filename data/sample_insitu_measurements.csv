@@ -2,12 +2,12 @@ datetime,lon,lat,station_name,measured_turbidity_fnu,measured_tss_mg_l
 2023-01-15 04:30:00,91.905,22.420,Karnaphuli_Upstream,28.5,31.2
 2023-01-15 04:45:00,91.918,22.415,Karnaphuli_Mid_Channel,42.0,46.5
 2023-01-15 05:00:00,91.932,22.423,Karnaphuli_Downstream,64.2,71.0
-2023-01-15 05:15:00,91.885,22.388,Karnaphuli_Port_Reach,53.0,58.8
+2023-01-15 05:15:00,91.884,22.388,Station_1,28.5,31.2
 2023-04-20 05:00:00,91.905,22.420,Karnaphuli_Upstream,34.0,37.5
 2023-04-20 05:15:00,91.918,22.415,Karnaphuli_Mid_Channel,51.5,57.0
 2023-04-20 05:30:00,91.932,22.423,Karnaphuli_Downstream,72.0,79.5
-2023-04-20 05:45:00,91.875,22.392,Karnaphuli_Estuary_Mouth,78.5,86.8
+2023-04-20 05:45:00,91.893,22.404,Station_2,51.5,57.0
 2023-07-18 04:30:00,91.905,22.420,Karnaphuli_Upstream,52.0,57.5
 2023-07-18 04:45:00,91.918,22.415,Karnaphuli_Mid_Channel,74.5,82.4
 2023-07-18 05:00:00,91.932,22.423,Karnaphuli_Downstream,98.0,108.5
-2023-10-25 05:00:00,91.918,22.415,Karnaphuli_Mid_Channel,46.2,51.0
+2023-10-25 05:00:00,91.905,22.420,Station_3,98.0,108.5
