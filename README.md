@@ -7,6 +7,7 @@ RivSat provides an 8-step interactive Jupyter notebook pipeline for downloading,
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![JupyterLab](https://img.shields.io/badge/JupyterLab-4.0+-orange.svg)](https://jupyter.org/)
+[![CI](https://github.com/shovon/rivsat/actions/workflows/ci.yml/badge.svg)](https://github.com/shovon/rivsat/actions)
 [![Tests](https://img.shields.io/badge/tests-46%20passed-brightgreen.svg)](tests/)
 
 ---
