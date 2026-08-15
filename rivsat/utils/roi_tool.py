@@ -468,7 +468,7 @@ def create_centerline_draw_map(
     elif center_coords is None:
         center_coords = (23.8103, 90.4125)
 
-    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles=None)
+    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles="OpenStreetMap")
 
     # 1. Google Maps Satellite
     folium.TileLayer(
@@ -558,7 +558,7 @@ def create_stations_draw_map(
     elif center_coords is None:
         center_coords = (23.8103, 90.4125)
 
-    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles=None)
+    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles="OpenStreetMap")
 
     # 1. Google Maps Satellite
     folium.TileLayer(
@@ -646,7 +646,7 @@ def create_interactive_roi_map(
         print("Folium is not installed. Run 'pip install folium' for interactive maps.")
         return None
 
-    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles=None)
+    m = folium.Map(location=center_coords, zoom_start=zoom_start, tiles="OpenStreetMap")
 
     folium.TileLayer(
         tiles="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",

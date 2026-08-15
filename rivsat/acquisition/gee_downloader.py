@@ -444,10 +444,22 @@ class GEEDownloader:
                         .filterBounds(self.ee_geometry)
                         .filterDate(t_start, t_end)
                         .filter(ee.Filter.lt(cloud_prop, max_cloud_cover))
+                        .sort(cloud_prop)
                         .select(bands)
                     )
 
                     scene_count = col.size().getInfo()
+                    if scene_count == 0:
+                        # Fallback to least-cloudy available scenes if max_cloud_cover threshold yields 0 scenes
+                        col = (
+                            ee.ImageCollection(collection_id)
+                            .filterBounds(self.ee_geometry)
+                            .filterDate(t_start, t_end)
+                            .sort(cloud_prop)
+                            .select(bands)
+                        )
+                        scene_count = col.size().getInfo()
+
                     if scene_count == 0:
                         pbar.update(1)
                         continue

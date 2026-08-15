@@ -25,6 +25,43 @@ except ImportError:
     TURBID_CMAP = "turbo"
     SPEED_CMAP = "viridis"
 
+from scipy.ndimage import distance_transform_edt
+
+def fill_spatial_cloud_gaps(
+    raster_arr: np.ndarray,
+    water_mask: Optional[np.ndarray] = None
+) -> np.ndarray:
+    """
+    Smoothly interpolates missing/cloud-masked pixels inside river channel using
+    Euclidean distance transform inpainting.
+
+    Parameters
+    ----------
+    raster_arr : np.ndarray
+        Turbidity or TSS raster array with NaNs for cloud/masked areas.
+    water_mask : np.ndarray, optional
+        Boolean water mask. If provided, restricts gap-filling strictly to water pixels.
+
+    Returns
+    -------
+    np.ndarray
+        Spatially reconstructed raster array with cloud holes filled.
+    """
+    if raster_arr is None:
+        return raster_arr
+    arr = np.asarray(raster_arr, dtype=np.float32).copy()
+    nan_mask = np.isnan(arr)
+    if not np.any(nan_mask) or np.all(nan_mask):
+        return arr
+    
+    indices = distance_transform_edt(nan_mask, return_distances=False, return_indices=True)
+    filled = arr[tuple(indices)]
+    
+    if water_mask is not None:
+        filled = np.where(water_mask, filled, np.nan)
+        
+    return filled.astype(np.float32)
+
 
 def plot_turbidity_map(
     turbidity_arr: np.ndarray,
@@ -293,10 +330,13 @@ def plot_cross_transects(
 
     for i, t_id in enumerate(transect_ids):
         sub = df[df["transect_id"] == t_id].sort_values("cross_dist_m")
+        sub_valid = sub.dropna(subset=["value"])
+        if sub_valid.empty:
+            continue
         ch_km = sub["chainage_km"].iloc[0] if "chainage_km" in sub.columns else 0.0
         ax.plot(
-            sub["cross_dist_m"],
-            sub["value"],
+            sub_valid["cross_dist_m"],
+            sub_valid["value"],
             label=f"{t_id} (Chainage: {ch_km:.1f} km)",
             color=colors[i],
             linewidth=2.0,

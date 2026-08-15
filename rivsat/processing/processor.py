@@ -246,9 +246,9 @@ class SceneProcessor:
             turbidity = np.where(mask_re_switch, turbidity_re, turbidity)
             tss = np.where(mask_re_switch, tss_re, tss)
 
-        # 7. Apply Water Mask
-        turbidity_masked = np.where(water_mask, turbidity, np.nan).astype(np.float32)
-        tss_masked = np.where(water_mask, tss, np.nan).astype(np.float32)
+        # 7. Apply Water Mask & Non-Physical Negative Filter
+        turbidity_masked = np.where(water_mask & (turbidity > 0.0), turbidity, np.nan).astype(np.float32)
+        tss_masked = np.where(water_mask & (tss > 0.0), tss, np.nan).astype(np.float32)
 
         # 8. Export Cloud-Optimized GeoTIFF Products
         out_profile = ref_profile.copy()

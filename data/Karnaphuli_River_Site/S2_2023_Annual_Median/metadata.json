@@ -4,12 +4,12 @@
   "composite_type": "annual",
   "reducer": "median",
   "scale": 20.0,
-  "input_scenes_count": 46,
+  "input_scenes_count": 56,
   "bands": [
-    "B3",
     "B2",
     "B4",
     "B5",
+    "B3",
     "B8A",
     "B8",
     "B11"

@@ -56,6 +56,20 @@ def extract_station_data(
         else:
             valid_vals = np.array([], dtype=np.float32)
 
+        # Adaptive spatial expansion fallback: if station pin hits land/cloud mask, search nearby water pixels
+        if len(valid_vals) == 0:
+            for extra in [1, 2, 3]:
+                search_rad = rad + extra * 2
+                sr_min = max(0, r - search_rad)
+                sr_max = min(height, r + search_rad + 1)
+                sc_min = max(0, c - search_rad)
+                sc_max = min(width, c + search_rad + 1)
+                if sr_max > sr_min and sc_max > sc_min:
+                    win_sub = raster_data[sr_min:sr_max, sc_min:sc_max]
+                    valid_vals = win_sub[~np.isnan(win_sub)]
+                    if len(valid_vals) > 0:
+                        break
+
         if len(valid_vals) > 0:
             stats = {
                 "station_name": names[i],
@@ -184,7 +198,7 @@ def extract_cross_transects(
     transform: rasterio.Affine,
     centerline_coords: List[Tuple[float, float]],
     num_transects: int = 5,
-    transect_length_m: float = 4000.0,
+    transect_length_m: float = 1000.0,
     samples_per_transect: int = 40
 ) -> pd.DataFrame:
     """

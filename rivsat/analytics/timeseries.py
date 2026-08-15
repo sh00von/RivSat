@@ -138,6 +138,34 @@ class TimeSeriesEngine:
         return df
 
     @staticmethod
+    def interpolate_gaps(
+        df: pd.DataFrame,
+        parameter: str = "turbidity",
+        method: str = "linear"
+    ) -> pd.DataFrame:
+        """
+        Fills missing temporal observation gaps across virtual stations using linear or time interpolation.
+        """
+        if df.empty or "datetime" not in df.columns:
+            return df
+
+        val_col = f"{parameter}_mean"
+        interpolated_groups = []
+        for _, group in df.groupby("station_name"):
+            group = group.sort_values("datetime").copy()
+            if val_col in group.columns:
+                group[val_col] = group[val_col].interpolate(method=method, limit_direction="both")
+                med_col = f"{parameter}_median"
+                if med_col in group.columns:
+                    group[med_col] = group[med_col].interpolate(method=method, limit_direction="both")
+            interpolated_groups.append(group)
+
+        if interpolated_groups:
+            result = pd.concat(interpolated_groups, ignore_index=True)
+            return result.sort_values("datetime").reset_index(drop=True)
+        return df
+
+    @staticmethod
     def filter_outliers(
         df: pd.DataFrame,
         value_column: str,

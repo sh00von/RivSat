@@ -53,6 +53,7 @@ from .validation import (
     recalibrate_nechad_coefficient
 )
 from .visualization import (
+    fill_spatial_cloud_gaps,
     plot_turbidity_map,
     plot_scene_triplet,
     plot_station_timeseries,

@@ -3,6 +3,7 @@ Publication-quality scientific visualization and plotting tools.
 """
 
 from .plotting import (
+    fill_spatial_cloud_gaps,
     plot_turbidity_map,
     plot_scene_triplet,
     plot_station_timeseries,
@@ -12,6 +13,7 @@ from .plotting import (
 )
 
 __all__ = [
+    "fill_spatial_cloud_gaps",
     "plot_turbidity_map",
     "plot_scene_triplet",
     "plot_station_timeseries",
