@@ -47,18 +47,28 @@ def calculate_validation_metrics(
             "Scatter_Index": np.nan
         }
 
-    # Vectorized errors
+    # Linear-space errors
     diff = sat_v - obs_v
     rmse = np.sqrt(np.mean(diff ** 2))
     mape = np.mean(np.abs(diff / obs_v)) * 100.0
     bias = np.mean(diff)
-
     mean_obs = np.mean(obs_v)
     si = (rmse / mean_obs) if mean_obs > 0 else np.nan
-
     ss_res = np.sum(diff ** 2)
     ss_tot = np.sum((obs_v - mean_obs) ** 2)
     r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else np.nan
+
+    # Log-space metrics (IOCCG 2019 standard for bio-optical parameters spanning orders of magnitude)
+    # RPD = median of log10(sat/obs) * 100  — symmetric, robust to outliers
+    # log-RMSE = sqrt(mean(log10(sat/obs)^2))
+    log_valid = (sat_v > 0) & (obs_v > 0)
+    if np.sum(log_valid) >= 2:
+        log_ratio = np.log10(sat_v[log_valid] / obs_v[log_valid])
+        log_rmse = float(np.sqrt(np.mean(log_ratio ** 2)))
+        rpd = float(np.median(log_ratio) * 100.0)
+    else:
+        log_rmse = np.nan
+        rpd = np.nan
 
     return {
         "N": int(n),
@@ -66,7 +76,9 @@ def calculate_validation_metrics(
         "RMSE": float(rmse),
         "MAPE_pct": float(mape),
         "Bias": float(bias),
-        "Scatter_Index": float(si)
+        "Scatter_Index": float(si),
+        "log_RMSE": log_rmse,
+        "RPD_pct": rpd,
     }
 
 
@@ -212,11 +224,32 @@ def recalibrate_nechad_coefficient(
     if r_arr is None or m_arr is None:
         raise ValueError("Must provide reflectances/rho_w and in_situ_turbidity/measured_values.")
 
-    band_key = band.upper()
-    if "S2" in NECHAD_COEFFICIENTS and band_key in NECHAD_COEFFICIENTS["S2"]:
-        default_a = NECHAD_COEFFICIENTS["S2"][band_key].get("A_T", 228.1)
-        default_c = NECHAD_COEFFICIENTS["S2"][band_key].get("C", 0.164)
+    # Map shorthand band names to full NECHAD_COEFFICIENTS keys
+    _BAND_KEY_MAP = {
+        "B4": "S2_B4_665nm",
+        "B5": "S2_B5_704nm",
+        "B8A": "S2_B8A_865nm",
+        "B8": "S2_B8_842nm",
+        "L8_B4": "L8_B4_655nm",
+        "L8_B5": "L8_B5_865nm",
+        "L9_B4": "L9_B4_655nm",
+        "L9_B5": "L9_B5_865nm",
+    }
+    band_key = _BAND_KEY_MAP.get(band.upper(), band.upper())
+
+    turb_coeffs = NECHAD_COEFFICIENTS.get("turbidity_FNU", {})
+    if band_key in turb_coeffs:
+        default_a = turb_coeffs[band_key]["A"]
+        default_c = turb_coeffs[band_key]["C"]
     else:
+        import warnings
+        warnings.warn(
+            f"Band key '{band_key}' not found in NECHAD_COEFFICIENTS. "
+            f"Falling back to S2 B4 defaults (A=228.1, C=0.164). "
+            f"Valid keys: {list(turb_coeffs.keys())}",
+            UserWarning,
+            stacklevel=2,
+        )
         default_a = 228.1
         default_c = 0.164
 

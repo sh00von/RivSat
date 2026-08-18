@@ -38,16 +38,17 @@ earthengine authenticate
 
 ## 3. Step-by-Step Workflow Guide
 
-Launch Jupyter Lab to run the master workflow notebook:
+Launch the RivSat desktop application:
 
 ```powershell
-python -m jupyterlab RivSat_Workflow.ipynb
+rivsat-gui
+# or: python -m rivsat.app
 ```
 
 ---
 
-### Step 1: User Configuration Block
-Open Cell 1 of `RivSat_Workflow.ipynb` and set your top-level study parameters:
+### Step 1: User Configuration
+In the app's **Configuration** dock (left side), set your top-level study parameters:
 
 ```python
 SITE_NAME = "Karnaphuli_River_Site"     # Unique site identifier
@@ -66,7 +67,7 @@ RivSat automatically ingests vector features from `./data/`:
 - **`centerline.geojson`**: River centerline polyline.
 - **`stations.geojson`**: Virtual monitoring station pins.
 
-*Note: If `centerline.geojson` or `stations.geojson` are missing, interactive folium maps in **Step 2B & 2C** allow you to draw them directly inside Jupyter Lab and click **Export**!*
+*Note: In the **Map & Layers** tab you can draw the AOI, centerline, transects, and stations directly on the interactive map — pick a role in the Layers panel, then draw. Geometry syncs live into the app (no file export needed).*
 
 ---
 

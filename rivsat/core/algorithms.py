@@ -5,8 +5,11 @@ Includes:
 - Nechad et al. (2010/2016) semi-analytical single-band models
 - Dogliotti et al. (2015) dual-band blended switching framework
 - Multi-conditional Red-Edge (704 nm) extreme plume extension
-- Cross-sensor Spectral Band Adjustment Factors (SBAFs)
+- Cross-sensor Spectral Band Adjustment Factors (SBAFs) with L9 note
 - Water index extraction (NDWI, MNDWI)
+- OC3 band-ratio Chlorophyll-a (O'Reilly & Werdell 2019) — coastal/open-ocean
+- Kd(490) diffuse attenuation coefficient (Morel et al. 2007)
+- FAI Floating Algae Index (Hu 2009) — bloom/macrophyte detection
 """
 
 import numpy as np
@@ -187,13 +190,47 @@ def apply_sbaf_correction(
     """
     Applies Spectral Band Adjustment Factors (SBAFs) to harmonize Landsat 8/9 OLI
     reflectance to Sentinel-2 MSI equivalent.
+
+    Notes
+    -----
+    L9 OLI-2 uses the same SBAF table as L8 OLI (Roy et al. 2021 confirm near-identical
+    spectral response functions). The correction is a linear polynomial valid for
+    rho_w ∈ [0, 0.25]; accuracy degrades at higher reflectances.
+    Unsupported conversion directions return the input array unchanged with a warning.
     """
-    if from_sensor.upper() in ["L8", "L9"] and to_sensor.upper() == "S2":
+    import warnings
+    fs = from_sensor.upper()
+    ts = to_sensor.upper()
+
+    if fs in ("L8", "L9") and ts == "S2":
         band_key = band.lower()
         if band_key in SBAF_FACTORS["L8_to_S2"]:
+            if fs == "L9":
+                warnings.warn(
+                    "Applying L8→S2 SBAF factors to L9 data. "
+                    "L9 OLI-2 spectral response is nearly identical to L8 OLI "
+                    "(Roy et al. 2021), but validate locally if precision is critical.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             params = SBAF_FACTORS["L8_to_S2"][band_key]
             corrected = params["slope"] * reflectance + params["intercept"]
             return np.maximum(corrected, 0.0).astype(np.float32)
+        else:
+            warnings.warn(
+                f"No SBAF entry for band='{band}' in L8→S2 table. "
+                f"Available: {list(SBAF_FACTORS['L8_to_S2'].keys())}. "
+                "Returning input unchanged.",
+                UserWarning,
+                stacklevel=2,
+            )
+    else:
+        warnings.warn(
+            f"SBAF from '{from_sensor}' to '{to_sensor}' is not supported. "
+            "Only L8/L9→S2 is implemented. Returning input unchanged.",
+            UserWarning,
+            stacklevel=2,
+        )
     return np.asarray(reflectance, dtype=np.float32)
 
 
@@ -316,3 +353,168 @@ def compute_secchi_depth(
         sdd = np.where(np.isnan(turb) | (turb <= 0.0), np.nan, sdd)
 
     return sdd.astype(np.float32)
+
+
+def compute_oc3_chlorophyll(
+    rho_blue: np.ndarray,
+    rho_green: np.ndarray,
+    rho_red: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Estimates Chlorophyll-a (ug/L) using the NASA OC3 band-ratio algorithm
+    (O'Reilly et al. 1998, updated coefficients from O'Reilly & Werdell 2019).
+
+    OC3 is the operational standard for MODIS, SeaWiFS, and PACE. It outperforms
+    NDCI in oligotrophic to mesotrophic coastal waters (Chl-a < 10 ug/L) where
+    the blue/green ratio retains sensitivity. NDCI is preferred in turbid productive
+    rivers (Chl-a > 20 ug/L, high TSS).
+
+        R = log10(max(rho_blue, rho_green) / rho_red)
+        log10(Chl-a) = a0 + a1*R + a2*R^2 + a3*R^3 + a4*R^4
+
+    Parameters
+    ----------
+    rho_blue : np.ndarray
+        Blue band water-leaving reflectance (~443-490 nm).
+    rho_green : np.ndarray
+        Green band water-leaving reflectance (~555 nm).
+    rho_red : np.ndarray
+        Red band water-leaving reflectance (~665 nm).
+    custom_coeffs : dict, optional
+        Override OC3 polynomial coefficients {'a0','a1','a2','a3','a4'}.
+
+    Returns
+    -------
+    np.ndarray
+        Chlorophyll-a in ug/L.
+
+    References
+    ----------
+    O'Reilly & Werdell (2019). Chlorophyll algorithms for ocean color sensors —
+    OC4, OC5 & OC6. RSE, 229, 32-47.
+    """
+    b = np.asarray(rho_blue, dtype=np.float32)
+    g = np.asarray(rho_green, dtype=np.float32)
+    r = np.asarray(rho_red, dtype=np.float32)
+
+    # O'Reilly & Werdell (2019) OC3 coefficients for Sentinel-2 / generic visible
+    _defaults = {"a0": 0.2515, "a1": -2.3798, "a2": 1.5823, "a3": -0.6372, "a4": -0.5692}
+    coeffs = custom_coeffs or _defaults
+    a0, a1, a2, a3, a4 = coeffs["a0"], coeffs["a1"], coeffs["a2"], coeffs["a3"], coeffs["a4"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        max_bg = np.maximum(b, g)
+        ratio = np.where((r > 0.0) & (max_bg > 0.0), max_bg / r, np.nan)
+        log_r = np.where(ratio > 0.0, np.log10(ratio), np.nan)
+        log_chl = a0 + a1 * log_r + a2 * log_r**2 + a3 * log_r**3 + a4 * log_r**4
+        chl_oc3 = np.where(np.isnan(log_r), np.nan, 10.0 ** log_chl)
+        chl_oc3 = np.where(chl_oc3 < 0.01, np.nan, chl_oc3)
+
+    return chl_oc3.astype(np.float32)
+
+
+def compute_kd490(
+    rho_blue: np.ndarray,
+    rho_green: np.ndarray,
+    custom_coeffs: Optional[Dict[str, float]] = None
+) -> np.ndarray:
+    """
+    Estimates the diffuse attenuation coefficient at 490 nm — Kd(490) in m^-1 —
+    using the NASA KD2 band-ratio algorithm (Mueller 2000, Morel et al. 2007).
+
+    Kd(490) quantifies how rapidly downwelling light attenuates with depth and is a
+    standard MODIS/SeaWiFS/PACE Level-3 ocean color product. It is the primary
+    input for euphotic zone depth (Zeu ≈ 4.6 / Kd(490)) and primary production
+    models in estuarine and coastal studies.
+
+        log10(Kd490) = a0 + a1 * log10(rho_blue / rho_green)
+
+    Parameters
+    ----------
+    rho_blue : np.ndarray
+        Blue band water-leaving reflectance (~443-490 nm).
+    rho_green : np.ndarray
+        Green band water-leaving reflectance (~555 nm).
+    custom_coeffs : dict, optional
+        Override coefficients {'a0', 'a1'}.
+
+    Returns
+    -------
+    np.ndarray
+        Kd(490) in m^-1.
+
+    References
+    ----------
+    Mueller (2000). SeaWiFS algorithm for the diffuse attenuation coefficient, K(490),
+    using water-leaving radiances at 490 and 555 nm. SeaWiFS Postlaunch Tech. Rep.
+    Morel et al. (2007). Examining the consistency of products derived from various
+    ocean color sensors. RSE, 111(1), 69-88.
+    """
+    b = np.asarray(rho_blue, dtype=np.float32)
+    g = np.asarray(rho_green, dtype=np.float32)
+
+    # KD2 coefficients (Morel et al. 2007, updated for generic blue/green bands)
+    _defaults = {"a0": -0.8813, "a1": -2.0584}
+    coeffs = custom_coeffs or _defaults
+    a0, a1 = coeffs["a0"], coeffs["a1"]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ratio = np.where((g > 0.0) & (b > 0.0), b / g, np.nan)
+        log_kd = a0 + a1 * np.log10(np.where(ratio > 0.0, ratio, np.nan))
+        kd490 = np.where(np.isnan(log_kd), np.nan, 10.0 ** log_kd)
+        kd490 = np.where(kd490 < 0.0, np.nan, kd490)
+
+    return kd490.astype(np.float32)
+
+
+def compute_fai(
+    rho_red: np.ndarray,
+    rho_nir: np.ndarray,
+    rho_swir: np.ndarray,
+    red_wl: float = 665.0,
+    nir_wl: float = 865.0,
+    swir_wl: float = 1610.0
+) -> np.ndarray:
+    """
+    Computes the Floating Algae Index (FAI) for detection of surface algal blooms,
+    Sargassum, water hyacinth, and other floating macrophytes (Hu 2009).
+
+    FAI = rho_nir - rho_nir_prime
+    where rho_nir_prime is the linear baseline between red and SWIR:
+        rho_nir_prime = rho_red + (rho_swir - rho_red) * (nir_wl - red_wl) / (swir_wl - red_wl)
+
+    Positive FAI indicates floating vegetation / algae. Negative FAI indicates open water.
+    Near-zero FAI (|FAI| < 0.01) is ambiguous (mixed pixels, cloud edges, turbid plumes).
+
+    Parameters
+    ----------
+    rho_red : np.ndarray
+        Red band reflectance (~665 nm).
+    rho_nir : np.ndarray
+        NIR band reflectance (~865 nm).
+    rho_swir : np.ndarray
+        SWIR band reflectance (~1610 nm).
+    red_wl, nir_wl, swir_wl : float
+        Central wavelengths (nm) for the three bands. Defaults are Sentinel-2 B4/B8A/B11.
+
+    Returns
+    -------
+    np.ndarray
+        FAI array (dimensionless). Positive = floating algae, negative = open water.
+
+    References
+    ----------
+    Hu (2009). A novel ocean color index to detect floating algae in the global oceans.
+    RSE, 113(10), 2118-2129.
+    """
+    r = np.asarray(rho_red, dtype=np.float32)
+    n = np.asarray(rho_nir, dtype=np.float32)
+    s = np.asarray(rho_swir, dtype=np.float32)
+
+    alpha = (nir_wl - red_wl) / (swir_wl - red_wl)
+    nir_prime = r + (s - r) * alpha
+    fai = n - nir_prime
+
+    invalid = np.isnan(r) | np.isnan(n) | np.isnan(s)
+    return np.where(invalid, np.nan, fai).astype(np.float32)

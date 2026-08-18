@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <link rel="stylesheet" href="vendor/leaflet-geoman.css" />
+  <script src="vendor/leaflet.js"></script>
+  <script src="vendor/leaflet-geoman.min.js"></script>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; font-family: "Segoe UI", sans-serif; }
+    #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+
+    .rs-coord {
+      position: absolute; bottom: 6px; right: 8px; z-index: 1000;
+      background: rgba(26,58,92,0.85); color: #fff; font-size: 11px;
+      padding: 3px 9px; border-radius: 4px; font-family: Consolas, monospace;
+      pointer-events: none;
+    }
+    .rs-search {
+      position: absolute; top: 10px; left: 50px; z-index: 1000;
+      display: flex; gap: 4px;
+    }
+    .rs-search input {
+      width: 240px; padding: 6px 10px; border: 1px solid #d0d5dd;
+      border-radius: 4px; font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .rs-search button {
+      padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer;
+      background: #1976d2; color: #fff; font-weight: 600; font-size: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .rs-search button:hover { background: #1558b0; }
+    .leaflet-container { background: #e8ecf0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="rs-search">
+    <input id="searchBox" type="text" placeholder="Search place or 'lat, lon' …"
+           onkeydown="if(event.key==='Enter') doSearch();" />
+    <button onclick="doSearch()">Go</button>
+  </div>
+  <div class="rs-coord" id="coord">lat —, lon —</div>
+
+  <script>
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Basemaps
+  // ─────────────────────────────────────────────────────────────────────────
+  const BASEMAPS = {
+    "Esri Satellite": L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Esri", maxZoom: 19 }),
+    "Google Satellite": L.tileLayer(
+      "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+      { attribution: "Google", maxZoom: 20 }),
+    "Google Hybrid": L.tileLayer(
+      "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+      { attribution: "Google", maxZoom: 20 }),
+    "OpenStreetMap": L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { attribution: "OSM", maxZoom: 19 }),
+    "CartoDB Light": L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { attribution: "CARTO", maxZoom: 20 }),
+    "Terrain": L.tileLayer(
+      "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      { attribution: "OpenTopoMap", maxZoom: 17 }),
+  };
+
+  const map = L.map("map", { zoomControl: true, center: [23.8103, 90.4125], zoom: 12 });
+  let currentBase = BASEMAPS["Esri Satellite"];
+  currentBase.addTo(map);
+  L.control.scale({ metric: true, imperial: false, position: "bottomleft" }).addTo(map);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Style + role model
+  // ─────────────────────────────────────────────────────────────────────────
+  const ROLE_STYLE = {
+    aoi:        { color: "#e65100", weight: 2.5, fillColor: "#e65100", fillOpacity: 0.12 },
+    centerline: { color: "#1565c0", weight: 3.5, opacity: 0.9 },
+    transects:  { color: "#8e24aa", weight: 3,   opacity: 0.9 },
+    stations:   { color: "#1b5e20", fillColor: "#43a047", fillOpacity: 0.9 },
+  };
+  let activeRole = "aoi";
+
+  // Feature groups per role
+  const groups = {
+    aoi:        L.featureGroup().addTo(map),
+    centerline: L.featureGroup().addTo(map),
+    transects:  L.featureGroup().addTo(map),
+    stations:   L.featureGroup().addTo(map),
+  };
+  const overlays = {};  // key -> L.imageOverlay
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  QWebChannel bridge
+  // ─────────────────────────────────────────────────────────────────────────
+  let bridge = null;
+  new QWebChannel(qt.webChannelTransport, function (channel) {
+    bridge = channel.objects.bridge;
+    if (bridge && bridge.ready) bridge.ready();
+  });
+
+  function emitFeature(role, geomType, coords, layerId) {
+    if (bridge && bridge.onFeatureDrawn)
+      bridge.onFeatureDrawn(role, geomType, JSON.stringify(coords), String(layerId));
+  }
+  function emitDeleted(role, layerId) {
+    if (bridge && bridge.onFeatureDeleted)
+      bridge.onFeatureDeleted(role, String(layerId));
+  }
+  function emitEdited(role, geomType, coords, layerId) {
+    if (bridge && bridge.onFeatureEdited)
+      bridge.onFeatureEdited(role, geomType, JSON.stringify(coords), String(layerId));
+  }
+
+  // Extract [lon,lat] coords from a layer
+  function layerCoords(layer) {
+    if (layer instanceof L.Marker) {
+      const ll = layer.getLatLng(); return [ll.lng, ll.lat];
+    }
+    if (layer instanceof L.Polygon) {
+      const rings = layer.getLatLngs()[0];
+      return rings.map(p => [p.lng, p.lat]);
+    }
+    if (layer instanceof L.Polyline) {
+      return layer.getLatLngs().map(p => [p.lng, p.lat]);
+    }
+    return null;
+  }
+  function layerGeomType(layer) {
+    if (layer instanceof L.Marker)  return "point";
+    if (layer instanceof L.Polygon) return "polygon";
+    if (layer instanceof L.Polyline) return "line";
+    return "unknown";
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Geoman setup
+  // ─────────────────────────────────────────────────────────────────────────
+  map.pm.addControls({
+    position: "topleft",
+    drawMarker: true, drawPolygon: true, drawPolyline: true,
+    drawRectangle: true, drawCircle: false, drawCircleMarker: false,
+    drawText: false, editMode: true, dragMode: true,
+    cutPolygon: false, removalMode: true, rotateMode: false,
+  });
+  map.pm.setPathOptions(ROLE_STYLE.aoi);
+
+  // When a new shape is created, assign it to the active role group
+  map.on("pm:create", function (e) {
+    const layer = e.layer;
+    const role = activeRole;
+    const lid = L.stamp(layer);
+    layer._rsRole = role;
+    layer._rsId = lid;
+    // remove from default, add to role group with role style
+    map.removeLayer(layer);
+    if (role !== "stations" && layer.setStyle) layer.setStyle(ROLE_STYLE[role]);
+    groups[role].addLayer(layer);
+
+    emitFeature(role, layerGeomType(layer), layerCoords(layer), lid);
+
+    // Live edit + remove hooks on this layer
+    layer.on("pm:edit", function () {
+      emitEdited(role, layerGeomType(layer), layerCoords(layer), lid);
+    });
+    layer.on("pm:remove", function () { emitDeleted(role, lid); });
+
+    // Stations: click to rename / set buffer
+    if (role === "stations") {
+      layer.on("dblclick", function () { editStation(layer); });
+      layer.bindTooltip(layer._rsName || ("Station " + lid), { permanent: false });
+    }
+  });
+
+  // Global remove (via delete tool)
+  map.on("pm:remove", function (e) {
+    const layer = e.layer;
+    if (layer._rsRole) emitDeleted(layer._rsRole, layer._rsId || L.stamp(layer));
+  });
+
+  function editStation(layer) {
+    const cur = layer._rsName || ("Station " + (layer._rsId || ""));
+    const name = prompt("Station name:", cur);
+    if (name === null) return;
+    const buf = prompt("Buffer pixels:", layer._rsBuffer || 2);
+    layer._rsName = name;
+    layer._rsBuffer = parseInt(buf) || 2;
+    layer.setTooltipContent(name);
+    if (bridge && bridge.onStationAttr)
+      bridge.onStationAttr(String(layer._rsId), name, layer._rsBuffer);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Cursor + search
+  // ─────────────────────────────────────────────────────────────────────────
+  map.on("mousemove", function (e) {
+    document.getElementById("coord").textContent =
+      "lat " + e.latlng.lat.toFixed(5) + ", lon " + e.latlng.lng.toFixed(5);
+  });
+
+  function doSearch() {
+    const q = document.getElementById("searchBox").value.trim();
+    if (!q) return;
+    // "lat, lon" ?
+    const m = q.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
+    if (m) {
+      const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+      map.setView([lat, lon], 14);
+      return;
+    }
+    fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q),
+          { headers: { "Accept-Language": "en" } })
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.length) {
+          map.setView([parseFloat(d[0].lat), parseFloat(d[0].lon)], 13);
+        } else { alert("No result for: " + q); }
+      })
+      .catch(() => alert("Search failed (offline?)"));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Python-callable API (invoked via runJavaScript)
+  // ─────────────────────────────────────────────────────────────────────────
+  window.RS = {
+    setBasemap: function (name) {
+      if (!BASEMAPS[name]) return;
+      map.removeLayer(currentBase);
+      currentBase = BASEMAPS[name];
+      currentBase.addTo(map);
+    },
+    setActiveRole: function (role) {
+      activeRole = role;
+      if (ROLE_STYLE[role]) map.pm.setPathOptions(ROLE_STYLE[role]);
+    },
+    setRoleVisible: function (role, vis) {
+      if (!groups[role]) return;
+      if (vis) map.addLayer(groups[role]); else map.removeLayer(groups[role]);
+    },
+    clearRole: function (role) {
+      if (groups[role]) groups[role].clearLayers();
+    },
+    zoomToRole: function (role) {
+      const g = groups[role];
+      if (g && g.getLayers().length) { try { map.fitBounds(g.getBounds().pad(0.1)); } catch (e) {} }
+    },
+    zoomToAll: function () {
+      const all = L.featureGroup(Object.values(groups).filter(g => g.getLayers().length));
+      try { if (all.getLayers().length) map.fitBounds(all.getBounds().pad(0.1)); } catch (e) {}
+    },
+    // features: {aoi:[[lon,lat]...], centerline:[[lon,lat]...],
+    //            transects:[[[lon,lat]...]], stations:[{name,lon,lat,buffer}]}
+    loadFeatures: function (jsonStr) {
+      const f = JSON.parse(jsonStr);
+      if (f.aoi && f.aoi.length) {
+        groups.aoi.clearLayers();
+        const latlngs = f.aoi.map(p => [p[1], p[0]]);
+        const poly = L.polygon(latlngs, ROLE_STYLE.aoi);
+        poly._rsRole = "aoi"; poly._rsId = L.stamp(poly);
+        _attachHooks(poly, "aoi");
+        groups.aoi.addLayer(poly);
+      }
+      if (f.centerline && f.centerline.length) {
+        groups.centerline.clearLayers();
+        const latlngs = f.centerline.map(p => [p[1], p[0]]);
+        const line = L.polyline(latlngs, ROLE_STYLE.centerline);
+        line._rsRole = "centerline"; line._rsId = L.stamp(line);
+        _attachHooks(line, "centerline");
+        groups.centerline.addLayer(line);
+      }
+      if (f.transects) {
+        groups.transects.clearLayers();
+        f.transects.forEach(t => {
+          const latlngs = t.map(p => [p[1], p[0]]);
+          const line = L.polyline(latlngs, ROLE_STYLE.transects);
+          line._rsRole = "transects"; line._rsId = L.stamp(line);
+          _attachHooks(line, "transects");
+          groups.transects.addLayer(line);
+        });
+      }
+      if (f.stations) {
+        groups.stations.clearLayers();
+        f.stations.forEach(s => {
+          const mk = L.circleMarker([s.lat, s.lon], { radius: 7, ...ROLE_STYLE.stations });
+          mk._rsRole = "stations"; mk._rsId = L.stamp(mk);
+          mk._rsName = s.name || "Station"; mk._rsBuffer = s.buffer || 2;
+          mk.bindTooltip(mk._rsName);
+          mk.on("dblclick", function () { editStation(mk); });
+          _attachHooks(mk, "stations");
+          groups.stations.addLayer(mk);
+        });
+      }
+      window.RS.zoomToAll();
+    },
+    addOverlay: function (key, pngUrl, bounds, opacity, label) {
+      if (overlays[key]) { map.removeLayer(overlays[key]); }
+      const ov = L.imageOverlay(pngUrl, bounds, { opacity: opacity, interactive: false });
+      overlays[key] = ov;
+      ov.addTo(map);
+    },
+    setOverlayVisible: function (key, vis) {
+      if (!overlays[key]) return;
+      if (vis) map.addLayer(overlays[key]); else map.removeLayer(overlays[key]);
+    },
+    setOverlayOpacity: function (key, op) {
+      if (overlays[key]) overlays[key].setOpacity(op);
+    },
+    zoomToOverlay: function (key) {
+      if (overlays[key]) { try { map.fitBounds(overlays[key].getBounds()); } catch (e) {} }
+    },
+  };
+
+  function _attachHooks(layer, role) {
+    const lid = layer._rsId;
+    layer.on("pm:edit", function () {
+      emitEdited(role, layerGeomType(layer), layerCoords(layer), lid);
+    });
+    layer.on("pm:remove", function () { emitDeleted(role, lid); });
+  }
+  </script>
+</body>
+</html>

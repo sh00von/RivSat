@@ -37,6 +37,15 @@ setup(
     url="https://github.com/shovon/rivsat",
     license="MIT",
     packages=find_packages(exclude=["tests*", "outputs*"]),
+    include_package_data=True,
+    package_data={
+        "rivsat.app.qt": [
+            "assets/*.html",
+            "assets/vendor/*.js",
+            "assets/vendor/*.css",
+            "assets/vendor/images/*.png",
+        ],
+    },
     python_requires=">=3.9",
     install_requires=[
         "earthengine-api>=0.1.350",
@@ -51,12 +60,23 @@ setup(
         "tqdm>=4.64.0",
         "requests>=2.28.0",
     ],
+    entry_points={
+        "console_scripts": [
+            "rivsat-gui=rivsat.app.qt.app:main",
+        ],
+    },
     extras_require={
         "full": [
             "cmocean>=3.0.0",
             "seaborn>=0.12.0",
             "ipywidgets>=8.0.0",
             "tifffile>=2023.1.0",
+        ],
+        "gui": [
+            "PyQt6>=6.6.0",
+            "PyQt6-WebEngine>=6.6.0",
+            "matplotlib>=3.6.0",
+            "folium>=0.14.0",
         ],
         "dev": [
             "pytest>=7.0.0",

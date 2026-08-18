@@ -20,7 +20,10 @@ from .algorithms import (
     compute_ndci_chlorophyll,
     compute_cdom,
     compute_salinity,
-    compute_secchi_depth
+    compute_secchi_depth,
+    compute_oc3_chlorophyll,
+    compute_kd490,
+    compute_fai,
 )
 from .water_mask import (
     create_s2_water_mask,
@@ -45,6 +48,9 @@ __all__ = [
     "compute_cdom",
     "compute_salinity",
     "compute_secchi_depth",
+    "compute_oc3_chlorophyll",
+    "compute_kd490",
+    "compute_fai",
     "create_s2_water_mask",
     "create_landsat_water_mask",
     "create_hybrid_water_mask",

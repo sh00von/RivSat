@@ -90,6 +90,16 @@ SBAF_FACTORS = {
 # ==============================================================================
 # 5. MULTI-PARAMETER WATER QUALITY CALIBRATION COEFFICIENTS
 # ==============================================================================
+# Regional applicability notes:
+# - chlorophyll_NDCI: calibrated for turbid productive inland/coastal waters (Mishra & Mishra 2012).
+#   For oligotrophic coastal waters or open ocean use OC3/OCI instead.
+# - cdom_GreenRed: calibrated for large river systems (Griffin et al. 2018). Use with caution
+#   in highly stratified estuaries or optically complex coastal water.
+# - salinity_CDOM: S_ocean=35.0 PSU assumes North Atlantic / equatorial ocean.
+#   Override with site-specific S_ocean for Bay of Bengal (~30-32 PSU),
+#   Mediterranean (~38-39 PSU), Red Sea (~40 PSU), or Baltic (<10 PSU).
+# - secchi_Turbidity: simplified empirical power law (Lee et al. 2015). Valid for
+#   turbid inland/estuarine water (T > 2 FNU). Use full QAA for optically complex open ocean.
 # References:
 # - Mishra & Mishra (2012): NDCI for Chlorophyll-a retrieval
 # - Griffin et al. (2018): CDOM estimation from spectral reflectance ratios
@@ -116,7 +126,7 @@ WATER_QUALITY_COEFFICIENTS = {
 }
 
 # ==============================================================================
-# 5. GOOGLE EARTH ENGINE DATASET CATALOG & BAND NAMES
+# 6. GOOGLE EARTH ENGINE DATASET CATALOG & BAND NAMES
 # ==============================================================================
 GEE_DATASETS: Dict[str, Dict[str, Any]] = {
     "S2_HARMONIZED": {

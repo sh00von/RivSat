@@ -2,11 +2,11 @@
 
 **A universal, physics-based satellite remote sensing and hydro-engineering platform designed for multi-parameter water quality mapping (Turbidity, TSS, Chlorophyll-a, CDOM, Estuarine Salinity, Secchi Depth), active river channel width ($W$) tracking, and longitudinal chainage analytics in rivers, estuaries, and coastal plumes.**
 
-RivSat provides a complete interactive Jupyter notebook pipeline for downloading, processing, analyzing, and exporting water quality retrievals from **Sentinel-2 MSI** and **Landsat 8/9 OLI** via **Google Earth Engine (GEE)**.
+RivSat provides a complete native desktop application (PyQt6) for downloading, processing, analyzing, and exporting water quality retrievals from **Sentinel-2 MSI** and **Landsat 8/9 OLI** via **Google Earth Engine (GEE)**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![JupyterLab](https://img.shields.io/badge/JupyterLab-4.0+-orange.svg)](https://jupyter.org/)
+[![PyQt6](https://img.shields.io/badge/GUI-PyQt6-green.svg)](https://pypi.org/project/PyQt6/)
 [![Tests](https://img.shields.io/badge/tests-51%20passed-brightgreen.svg)](tests/)
 
 ---
@@ -28,7 +28,7 @@ RivSat provides a complete interactive Jupyter notebook pipeline for downloading
 - [System Requirements](#-system-requirements)
 - [Installation Guide](#-installation-guide)
 - [Google Earth Engine Setup](#-google-earth-engine-gee-setup)
-- [Launching Jupyter Lab](#-launching-jupyter-lab)
+- [Launching the Desktop App](#-launching-the-desktop-app)
 - [Troubleshooting & Common Issues](#-troubleshooting--common-issues)
 - [Scientific Capabilities](#-key-scientific-capabilities)
 - [Codebase Structure](#-codebase-structure)
@@ -127,19 +127,29 @@ rivsat.initialize_gee(project_id="your-gcp-project-id")
 
 ---
 
-## 📓 Launching Jupyter Lab
+## 🖥️ Launching the Desktop App
 
-Open the primary 8-step research workflow notebook:
+Install the GUI extra, then launch the native desktop application:
 
 ```bash
 # Activate your environment if not already active
 conda activate rivsat  # or: source venv/bin/activate
 
-# Launch JupyterLab
-jupyter lab RivSat_Workflow.ipynb
+# Install with the GUI extra (PyQt6 + WebEngine)
+pip install -e .[gui]
+
+# Launch the app
+rivsat-gui
+# or equivalently:
+python -m rivsat.app
 ```
 
-### Quick Verification Script inside Jupyter:
+The app opens with six workflow tabs — **Map & Layers**, **Acquisition**,
+**Processing**, **Time-Series**, **Profiles**, and **Export** — plus a
+dockable configuration panel. Draw your AOI, river centerline, transects,
+and monitoring stations directly on the interactive map.
+
+### Quick verification (Python):
 
 ```python
 import rivsat
@@ -151,6 +161,8 @@ rivsat.initialize_gee()
 features = rivsat.load_geojson_features("./data/user_roi.geojson")
 print(f"[OK] Ingested AOI with {len(features['aoi_polygon'])} vertices")
 ```
+
+To build a standalone `.exe`, see [`build/README_BUILD.md`](build/README_BUILD.md).
 
 ---
 
@@ -165,11 +177,9 @@ print(f"[OK] Ingested AOI with {len(features['aoi_polygon'])} vertices")
   conda install -c conda-forge rasterio shapely geopandas
   ```
 
-### 3. Folium Maps Not Rendering in JupyterLab
-- **Solution**: Install the JupyterLab widget extension:
-  ```bash
-  pip install ipywidgets folium
-  ```
+### 3. Map Panel Blank in the Desktop App
+- **Solution**: Ensure `PyQt6-WebEngine` is installed (`pip install -e .[gui]`).
+  The interactive map requires the Qt WebEngine (Chromium) component.
 
 ---
 
@@ -194,9 +204,11 @@ print(f"[OK] Ingested AOI with {len(features['aoi_polygon'])} vertices")
 
 ```
 rivsat/
-├── RivSat_Workflow.ipynb      # 🌟 Primary 8-step interactive Jupyter Lab notebook
 ├── rivsat/                    # Core Python package
 │   ├── __init__.py            # Top-level API facade
+│   ├── app/                   # 🖥️ Native PyQt6 desktop application
+│   │   ├── qt/                #   Main window, tabs, interactive Leaflet map, theme
+│   │   └── state.py           #   Shared application state
 │   ├── core/                  # Nechad/Dogliotti equations & water masking
 │   ├── acquisition/           # Earth Engine query engine & compositing
 │   ├── processing/            # Multi-core parallel batch processor

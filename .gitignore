@@ -9,6 +9,11 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+# …but keep the RivSat PyInstaller build config (source, not build output)
+!build/
+build/*
+!build/rivsat.spec
+!build/README_BUILD.md
 develop-eggs/
 dist/
 downloads/

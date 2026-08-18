@@ -13,7 +13,7 @@ Welcome to the official documentation for **RivSat** — a universal, physics-ba
 | :--- | :--- | :--- |
 | 📖 [**Literature Review**](LITERATURE_REVIEW.md) | Comprehensive academic review of bio-optical algorithms and peer-reviewed studies (Dogliotti 2015, Nechad 2010/2016, Mishra 2012, Griffin 2018, Subramaniam 2011, Lee 2015). | Researchers, Academics, Remote Sensing Specialists |
 | 🧮 [**Algorithms & Physics Guide**](ALGORITHMS_GUIDE.md) | Mathematical equations, spectral band formulations, radiative transfer models, and water masking logic for all 6 parameters. | Bio-Optical Scientists, Software Developers |
-| 🚀 [**User Guide & Quickstart**](USER_GUIDE.md) | Step-by-step instructions for installation, GEE setup, spatial vector layer creation, and notebook execution. | All Users & Practitioners |
+| 🚀 [**User Guide & Quickstart**](USER_GUIDE.md) | Step-by-step instructions for installation, GEE setup, spatial vector layer creation, and running the desktop app. | All Users & Practitioners |
 | 🏗️ [**Hydro-Engineering Guide**](HYDRO_ENGINEERING_GUIDE.md) | Practical applications for river engineering: Active channel width ($W$), longitudinal chainage profiles, and estuarine salinity tracking. | Civil & Water Resources Engineers, Hydrologists |
 | 🗺️ [**GIS Integration Guide**](GIS_INTEGRATION.md) | Details on Cloud-Optimized GeoTIFF exports, QGIS/ArcGIS workflows, CSV reports, and GeoJSON vector layers. | GIS Analysts, Spatial Data Engineers |
 

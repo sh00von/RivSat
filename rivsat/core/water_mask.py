@@ -149,8 +149,12 @@ def create_hybrid_water_mask(
     # 1. Base QA mask if provided
     if qa_or_scl is not None:
         if sensor.upper().startswith("S2"):
-            # Exclude clouds, shadows, dense vegetation
-            qa_valid = ~np.isin(qa_or_scl, [0, 1, 3, 8, 9, 10, 11])
+            # Exclude fill, defective, cloud shadows, vegetation, clouds, cirrus, snow
+            # SCL 4=VEGETATION is excluded here; NDWI below provides a second catch for
+            # mixed pixels (e.g., emergent macrophytes in turbid water). SCL 5=NOT_VEGETATED
+            # and SCL 7=UNCLASSIFIED are allowed so that hyper-turbid water misclassified
+            # as non-water land by the classifier still reaches the NDWI filter.
+            qa_valid = ~np.isin(qa_or_scl, [0, 1, 3, 4, 8, 9, 10, 11])
         else:
             qa_valid = create_landsat_water_mask(qa_or_scl, strict_water_only=False)
     else:

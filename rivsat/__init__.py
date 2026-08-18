@@ -1,16 +1,17 @@
 """
-RivSat: High-Performance Satellite Remote Sensing of Water Turbidity and TSS.
+RivSat: High-Performance Satellite Remote Sensing of River, Estuary & Coastal Water Quality.
 
 A modular CoastSat-style bio-optical satellite processing framework utilizing Google Earth Engine,
-the Dogliotti et al. (2015) blended dual-band algorithm, and Nechad et al. (2010/2016)
-semi-analytical models for mapping riverine, estuarine, and coastal water quality.
+the Dogliotti et al. (2015) blended dual-band algorithm, Nechad et al. (2010/2016)
+semi-analytical models, and NASA standard coastal algorithms (OC3, Kd490, FAI) for mapping
+riverine, estuarine, and coastal water quality.
 
 Sub-packages:
-    - rivsat.core: Radiative transfer equations, Nechad/Dogliotti models, and water masking
+    - rivsat.core: Radiative transfer equations, Nechad/Dogliotti/OC3/Kd490/FAI, and water masking
     - rivsat.acquisition: Earth Engine query engine and temporal compositing
     - rivsat.processing: Parallel batch bio-optical raster processor
     - rivsat.analytics: Longitudinal profiles, cross-river transects, and Mann-Kendall time-series
-    - rivsat.validation: In-situ KD-Tree spatial matchups and optical parameter recalibration
+    - rivsat.validation: In-situ KD-Tree spatial matchups, log-RMSE/RPD metrics, recalibration
     - rivsat.visualization: Publication-quality spatial maps, product triplets, and scatter plots
     - rivsat.utils: GeoJSON spatial layer tools, interactive Leaflet maps, and logging
 """
@@ -20,6 +21,7 @@ from .core import (
     DOGLIOTTI_THRESHOLDS,
     REDEDGE_THRESHOLDS,
     SBAF_FACTORS,
+    WATER_QUALITY_COEFFICIENTS,
     GEE_DATASETS,
     compute_nechad_model,
     compute_dogliotti_blended,
@@ -27,6 +29,9 @@ from .core import (
     apply_sbaf_correction,
     compute_ndwi,
     compute_mndwi,
+    compute_oc3_chlorophyll,
+    compute_kd490,
+    compute_fai,
     create_s2_water_mask,
     create_landsat_water_mask,
     create_hybrid_water_mask
@@ -85,6 +90,7 @@ __all__ = [
     "DOGLIOTTI_THRESHOLDS",
     "REDEDGE_THRESHOLDS",
     "SBAF_FACTORS",
+    "WATER_QUALITY_COEFFICIENTS",
     "GEE_DATASETS",
     "compute_nechad_model",
     "compute_dogliotti_blended",
@@ -92,6 +98,9 @@ __all__ = [
     "apply_sbaf_correction",
     "compute_ndwi",
     "compute_mndwi",
+    "compute_oc3_chlorophyll",
+    "compute_kd490",
+    "compute_fai",
     "create_s2_water_mask",
     "create_landsat_water_mask",
     "create_hybrid_water_mask",
